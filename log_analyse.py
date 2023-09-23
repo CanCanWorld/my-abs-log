@@ -16,7 +16,6 @@ from config import *
 from common.common import (random_char, text_abstract, special_update_dict, get_quartile, convert_time,
                            log_pattern_obj, request_uri_pattern_obj, mongo_client, get_delta_date, todo_log)
 
-
 logging.basicConfig(format='%(asctime)s %(levelname)7s: %(message)s', datefmt='%Y%m%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 logger.setLevel(ERROR_LEVEL)
@@ -40,7 +39,8 @@ class MyMongo(object):
         try:
             self.mongodb['main'].insert_many(bulk_doc)  # 插入数据
             self.mongodb['registry'].update({'server': server},
-                                            {'$set': {'offset': offset, 'inode': inode, 'timestamp': timestamp}}, upsert=True)
+                                            {'$set': {'offset': offset, 'inode': inode, 'timestamp': timestamp}},
+                                            upsert=True)
         except Exception as err:
             logger.error('{} insert data error: {}'.format(self.db_name, repr(err)))
             raise
@@ -136,13 +136,15 @@ class LogPlainText(LogBase):
             else:
                 request_method = request_further.group('request_method')
                 # 对uri和args进行抽象
-                uri_abs, args_abs = text_abstract(request_uri_=request_further.group('request_uri'), log_name_=self.log_name)
+                uri_abs, args_abs = text_abstract(request_uri_=request_further.group('request_uri'),
+                                                  log_name_=self.log_name)
         elif 'request_uri' in parsed_dict:
             request_method = parsed_dict['request_method']
             uri_abs, args_abs = text_abstract(request_uri_=parsed_dict['request_uri'], log_name_=self.log_name)
         else:
             request_method = parsed_dict['request_method']
-            uri_abs, args_abs = text_abstract(uri_=parsed_dict['uri'], args_=parsed_dict['args'], log_name_=self.log_name)
+            uri_abs, args_abs = text_abstract(uri_=parsed_dict['uri'], args_=parsed_dict['args'],
+                                              log_name_=self.log_name)
 
         return {'uri_abs': uri_abs, 'args_abs': args_abs, 'time_local': time_local, 'response_code': int(response_code),
                 'bytes_sent': int(bytes_sent), 'request_time': float(request_time), 'remote_addr': remote_addr,
@@ -189,10 +191,12 @@ class LogJson(LogBase):
             else:
                 request_method = request_further.group('request_method')
                 # 对uri和args进行抽象
-                uri_abs, args_abs = text_abstract(request_uri_=request_further.group('request_uri'), log_name_=self.log_name)
+                uri_abs, args_abs = text_abstract(request_uri_=request_further.group('request_uri'),
+                                                  log_name_=self.log_name)
         elif 'request_uri' in self.reverse_dict:
             request_method = parsed_dict[self.reverse_dict['request_method']]
-            uri_abs, args_abs = text_abstract(request_uri_=parsed_dict[self.reverse_dict['request_uri']], log_name_=self.log_name)
+            uri_abs, args_abs = text_abstract(request_uri_=parsed_dict[self.reverse_dict['request_uri']],
+                                              log_name_=self.log_name)
         else:
             request_method = parsed_dict[self.reverse_dict['request_method']]
             if 'uri' in self.reverse_dict:
@@ -206,7 +210,7 @@ class LogJson(LogBase):
             uri_abs, args_abs = text_abstract(uri_=uri, args_=args, log_name_=self.log_name)
 
         return {'uri_abs': uri_abs, 'args_abs': args_abs, 'time_local': time_local, 'response_code': int(response_code),
-                'bytes_sent': int(bytes_sent), 'request_time': float(request_time),  'remote_addr': remote_addr,
+                'bytes_sent': int(bytes_sent), 'request_time': float(request_time), 'remote_addr': remote_addr,
                 'user_ip': user_ip, 'last_cdn_ip': last_cdn_ip, 'request_method': request_method}
 
 
@@ -214,8 +218,11 @@ class Processor(object):
     def __init__(self, log_name):
         """log_name: 日志文件名"""
         self.log_name = log_name
+        print('log_name: ', self.log_name)
         self.base_name = path.basename(log_name)
+        print('base_name: ', self.base_name)
         self.db_name = self.base_name.replace('.', '_')  # mongodb中的库名(将域名中的.替换为_)
+        print('db_name: ', self.db_name)
         self.mymongo = MyMongo(self.db_name)
         self.processed_num = 0  # 总请求数
         self.invalid_hits = 0  # 无效请求数
@@ -307,8 +314,10 @@ class Processor(object):
         ip_type: user_ip_via_cdn, last_cdn_ip, user_ip_via_proxy, remote_addr"""
         if len(self.uri_v[ip_type]) > IP_STORE_MAX_NUM:
             logger.debug("{} {} truncate {} sorted by 'hits' from {} to {} at {}".format(
-                self.base_name, self.uri_k, ip_type, len(self.main_stage[self.uri_k][ip_type]), IP_STORE_MAX_NUM, self.this_h_m))
-        for ip_k, ip_v in sorted(self.uri_v[ip_type].items(), key=lambda item: item[1]['hits'], reverse=True)[:IP_STORE_MAX_NUM]:
+                self.base_name, self.uri_k, ip_type, len(self.main_stage[self.uri_k][ip_type]), IP_STORE_MAX_NUM,
+                self.this_h_m))
+        for ip_k, ip_v in sorted(self.uri_v[ip_type].items(), key=lambda item: item[1]['hits'], reverse=True)[
+                          :IP_STORE_MAX_NUM]:
             # 取ip类型为ip_type的统计中点击量前IP_STORE_MAX_NUM的user_ip_via_cdn
             # if ip_v['hits'] < IP_STORE_MIN_HITS:
             #     break
@@ -330,7 +339,8 @@ class Processor(object):
         if uri_abs in self.main_stage:
             self.main_stage[uri_abs]['hits'] += 1
         else:
-            self.main_stage[uri_abs] = {'time': [], 'bytes': [], 'hits': 1, 'args': {}, 'errors': {}, 'user_ip_via_cdn': {},
+            self.main_stage[uri_abs] = {'time': [], 'bytes': [], 'hits': 1, 'args': {}, 'errors': {},
+                                        'user_ip_via_cdn': {},
                                         'last_cdn_ip': {}, 'user_ip_via_proxy': {}, 'remote_addr': {}}
         # 将args_abs数据汇总到临时字典
         if args_abs in self.main_stage[uri_abs]['args']:
@@ -377,12 +387,17 @@ class Processor(object):
     def _generate_bulk_docs(self, date):
         """生成每分钟的文档, 存放到self.bulk_documents中"""
         minute_main_doc = {
-            '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(random_char) + '-' + server,
+            '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(
+                random_char) + '-' + server,
             'total_hits': self.processed_num,
             'invalid_hits': self.invalid_hits,
             'error_hits': self.error_hits,
-            'total_bytes': self.main_stage['source']['from_cdn']['bytes'] + self.main_stage['source']['from_reverse_proxy']['bytes'] + self.main_stage['source']['from_client_directly']['bytes'],
-            'total_time': round(self.main_stage['source']['from_cdn']['time'] + self.main_stage['source']['from_reverse_proxy']['time'] + self.main_stage['source']['from_client_directly']['time'], 3),
+            'total_bytes': self.main_stage['source']['from_cdn']['bytes'] +
+                           self.main_stage['source']['from_reverse_proxy']['bytes'] +
+                           self.main_stage['source']['from_client_directly']['bytes'],
+            'total_time': round(
+                self.main_stage['source']['from_cdn']['time'] + self.main_stage['source']['from_reverse_proxy'][
+                    'time'] + self.main_stage['source']['from_client_directly']['time'], 3),
             'requests': [],
             'source': self.main_stage.pop('source')}
         minute_main_doc['requests'].extend(self._final_uri_dicts())
@@ -396,9 +411,12 @@ class Processor(object):
 
     def go_process(self):
         """开始处理日志文件"""
+        print('"""开始处理日志文件"""')
         if LOG_TYPE == 'plaintext':
+            print('"""plaintext"""')
             logobj = LogPlainText(self.log_name)
         elif LOG_TYPE == 'json':
+            print('"""json"""')
             logobj = LogJson(self.log_name)
         else:
             logger.error("wrong LOG_TYPE in config.py, must one of 'plaintext' or 'json'")
@@ -407,13 +425,15 @@ class Processor(object):
         try:
             # 对于一个日志文件名, 上一次处理到的offset和inode
             last_offset, last_inode = self.mymongo.get_prev_info()
-            ##print('log_name:',self.log_name, 'last_offset:', last_offset, 'last_inode:', last_inode)
-        except Exception:
+            print('log_name:', self.log_name, 'last_offset:', last_offset, 'last_inode:', last_inode)
+        except Exception as e:
+            print(str(e))
             return
 
         if last_inode and last_inode != logobj.cur_inode:
             # 发生了日志切割, 要检查并处理被切割操作移走的上一个文件(可能会遗留部分未处理的内容)
-            last_log_name = run('find / -inum {}'.format(last_inode), shell=True, stdout=PIPE, universal_newlines=True).stdout.rstrip('\n')
+            last_log_name = run('find / -inum {}'.format(last_inode), shell=True, stdout=PIPE,
+                                universal_newlines=True).stdout.rstrip('\n')
             another_processor = Processor(last_log_name)
             another_processor.mymongo = MyMongo(self.db_name)  # 这里将切割后文件对应的库重定向到当前库(一个日志唯一的库)
             another_processor.go_process()
@@ -443,7 +463,8 @@ class Processor(object):
                 self._generate_bulk_docs(date)
                 if len(self.bulk_documents) == BATCH_INSERT:  # 累积BATCH_INSERT个文档后执行一次批量插入
                     try:
-                        self.mymongo.insert_mongo(self.bulk_documents, parsed_offset, logobj.cur_inode, date + self.this_h_m)
+                        self.mymongo.insert_mongo(self.bulk_documents, parsed_offset, logobj.cur_inode,
+                                                  date + self.this_h_m)
                         self.bulk_documents = []
                     except Exception:
                         return  # 这里用exit无法退出主程序
@@ -485,7 +506,7 @@ if __name__ == "__main__":
 
     server = gethostname()  # 主机名
 
-    with open('/tmp/test_singleton', 'wb') as f:
+    with open('./tmp/test_singleton', 'wb') as f:
         try:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # 实现单例执行
         except BlockingIOError:
