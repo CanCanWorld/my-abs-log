@@ -36,7 +36,7 @@ ERROR_LEVEL = 'INFO'
 
 # ----mongodb
 # 链接设置
-MONGO_HOST = '172.16.2.24'
+MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
 # 存储设置
 # mongodb存储结构为每个站点对应一个库一个集合(main), 每分钟每server产生一个统计结果文档(即分析粒度最小达到分钟级)

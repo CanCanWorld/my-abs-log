@@ -3,7 +3,7 @@
 # Collect nginx access log, process it and insert the result into mongodb.
 # This script should put into crontab in every web server. Execute every N minutes.
 import logging
-import fcntl
+# import fcntl
 import json
 from socket import gethostname
 from multiprocessing import Pool
@@ -26,7 +26,9 @@ class MyMongo(object):
         """获得Database(MongoClient）对象
         db_name: mongodb的库名(不同站点对应不同的库名)"""
         self.db_name = db_name
+        print('db_name:', self.db_name)
         self.mongodb = mongo_client[db_name]
+        print('mongodb:', self.mongodb)
 
     def insert_mongo(self, bulk_doc, offset, inode, timestamp):
         """插入mongodb
@@ -38,6 +40,7 @@ class MyMongo(object):
         ##print('db_name:', self.db_name, 'cur_offset:', offset, 'cur_inode:', inode)
         try:
             self.mongodb['main'].insert_many(bulk_doc)  # 插入数据
+            server = gethostname()  # 主机名
             self.mongodb['registry'].update({'server': server},
                                             {'$set': {'offset': offset, 'inode': inode, 'timestamp': timestamp}},
                                             upsert=True)
@@ -49,18 +52,21 @@ class MyMongo(object):
 
     def get_prev_info(self):
         """取得本server本日志这一天已入库的offset"""
-        ##print('db_name:', self.db_name, 'server:', server)
+        print('"""取得本server本日志这一天已入库的offset"""')
+        server = gethostname()  # 主机名
+        print('db_name:', self.db_name, 'server:', server)
         tmp = self.mongodb['registry'].find({'server': server}, {'server': 1, 'inode': 1, 'offset': 1})
         try:
+            print('tmp.next')
             res = tmp.next()
             return res['offset'], res['inode']
         except StopIteration:
             return 0, 0
-        except Exception as err:
-            logger.error("get offset of {} at {} error, will exit: {}".format(self.db_name, server, repr(err)))
-            raise
-        finally:
-            mongo_client.close()
+        # except Exception as err:
+        #     logger.error("get offset of {} at {} error, will exit: {}".format(self.db_name, server, repr(err)))
+        #     raise
+        # finally:
+        #     mongo_client.close()
 
     def del_old_data(self, date, h_m):
         """删除N天前的数据, 默认为LIMIT
@@ -386,6 +392,7 @@ class Processor(object):
 
     def _generate_bulk_docs(self, date):
         """生成每分钟的文档, 存放到self.bulk_documents中"""
+        server = gethostname()  # 主机名
         minute_main_doc = {
             '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(
                 random_char) + '-' + server,
@@ -504,13 +511,13 @@ if __name__ == "__main__":
         print("Usage:\n  log_analyse.py [-f <log_path>...]")
         exit(12)
 
-    server = gethostname()  # 主机名
+    # server = gethostname()  # 主机名
 
     with open('./tmp/test_singleton', 'wb') as f:
-        try:
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # 实现单例执行
-        except BlockingIOError:
-            exit(11)
+        # try:
+        #     fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # 实现单例执行
+        # except BlockingIOError:
+        #     exit(11)
         if argv_log_list:
             logs_list = [path.join(getcwd(), x) if not x.startswith('/') else x for x in argv_log_list]
         else:
