@@ -5,9 +5,22 @@ LOG_TYPE = 'plaintext'
 
 # nginx配置文件中定义的日志格式
 # plaintext
+#127.0.0.1
+# -
+# -
+# [27/Sep/2023:14:11:46 +0800]
+# "GET / HTTP/1.1"
+# 304
+# 0
+# "-"
+# "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/117.0"
 LOG_FORMAT = '$remote_addr - [$time_local] "$request" '\
              '$status $body_bytes_sent $request_time "$http_referer" '\
              '"$http_user_agent" - $http_x_forwarded_for'
+
+# LOG_FORMAT = '$remote_addr - $remote_user [$time_local] "$request" '\
+#              '$status $body_bytes_sent "$http_referer" "$http_user_agent" '\
+#              '"$http_x_forwarded_for" "$request_time" "$upstream_response_time"'
 """
 # json
 LOG_FORMAT = '{"timestamp":"$time_iso8601",'\

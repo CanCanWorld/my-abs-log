@@ -5,6 +5,7 @@
 import logging
 # import fcntl
 import json
+import re
 from socket import gethostname
 from multiprocessing import Pool
 from random import choice
@@ -59,12 +60,14 @@ class MyMongo(object):
         try:
             print('tmp.next')
             res = tmp.next()
+            print(res['offset'])
+            print(res['inode'])
             return res['offset'], res['inode']
         except StopIteration:
             return 0, 0
-        # except Exception as err:
-        #     logger.error("get offset of {} at {} error, will exit: {}".format(self.db_name, server, repr(err)))
-        #     raise
+        except Exception as err:
+            logger.error("get offset of {} at {} error, will exit: {}".format(self.db_name, server, repr(err)))
+            raise
         # finally:
         #     mongo_client.close()
 
@@ -85,6 +88,7 @@ class MyMongo(object):
 class LogBase(object):
     def __init__(self, log_name):
         """根据文件名或者inode获取文件信息"""
+        print("LogBase.__init__")
         self.log_name = log_name
         fstat = stat(log_name)
         self.cur_size = fstat.st_size
@@ -98,6 +102,11 @@ class LogPlainText(LogBase):
         处理每一行记录
         line_str: 该行日志的原始形式
         """
+        log_pattern = r'^(?P<remote_addr>.*?) - (?P<remote_user>.*?) \[(?P<time_local>.*?)\] "(?P<request>.*?)" ' \
+                      r'(?P<status>.*?) (?P<body_bytes_sent>.*?) "(?P<http_referer>.*?)" ' \
+                      r'"(?P<http_user_agent>.*?)" "(?P<http_x_forwarded_for>.*?)" ' \
+                      r'"(?P<request_time>.*?)" "(?P<upstream_response_time>.*?)"$'
+        log_pattern_obj = re.compile(log_pattern)
         parsed = log_pattern_obj.match(line_str)
         if not parsed:
             # 如果正则无法匹配该行时
@@ -439,6 +448,7 @@ class Processor(object):
 
         if last_inode and last_inode != logobj.cur_inode:
             # 发生了日志切割, 要检查并处理被切割操作移走的上一个文件(可能会遗留部分未处理的内容)
+            print("发生了日志切割, 要检查并处理被切割操作移走的上一个文件(可能会遗留部分未处理的内容)")
             last_log_name = run('find / -inum {}'.format(last_inode), shell=True, stdout=PIPE,
                                 universal_newlines=True).stdout.rstrip('\n')
             another_processor = Processor(last_log_name)
@@ -449,6 +459,7 @@ class Processor(object):
             ##print('last_inode', 'end')
 
         # 打开文件,找到相应的offset进行处理
+        print("打开文件,找到相应的offset进行处理")
         fobj = open(self.log_name)
         fobj.seek(last_offset)
         parsed_offset = last_offset
@@ -466,31 +477,39 @@ class Processor(object):
             date, hour, minute = line_res['time_local']
 
             # 分钟粒度交替时: 从临时字典中汇总上一分钟的结果并将其入库
+            print("分钟粒度交替时: 从临时字典中汇总上一分钟的结果并将其入库")
             if self.this_h_m != hour + minute and self.this_h_m:
                 self._generate_bulk_docs(date)
                 if len(self.bulk_documents) == BATCH_INSERT:  # 累积BATCH_INSERT个文档后执行一次批量插入
+                    print("累积BATCH_INSERT个文档后执行一次批量插入")
                     try:
                         self.mymongo.insert_mongo(self.bulk_documents, parsed_offset, logobj.cur_inode,
                                                   date + self.this_h_m)
                         self.bulk_documents = []
                     except Exception:
+                        print("出错")
                         return  # 这里用exit无法退出主程序
                 # 清空临时字典self.main_stage, invalid, processed_num
+                print("清空临时字典self.main_stage, invalid, processed_num")
                 self._reset_every_minute()
                 logger.info('{} processed to {}'.format(self.base_name, ''.join(line_res['time_local'])))
 
             # 不到分钟粒度交替时:
+            print("不到分钟粒度交替时")
             self.processed_num += 1
             self.this_h_m = hour + minute
             self._append_line_to_main_stage(line_res)  # 对每一行的解析结果进行处理
 
         # 最后可能会存在一部分已解析但未达到分钟交替的行, 需要额外逻辑进行入库
+        print("最后可能会存在一部分已解析但未达到分钟交替的行, 需要额外逻辑进行入库")
         if self.processed_num > 0:
             self._generate_bulk_docs(date)
         if self.bulk_documents and self.this_h_m:
             try:
+                print("bulk_documents: ", self.bulk_documents)
                 self.mymongo.insert_mongo(self.bulk_documents, parsed_offset, logobj.cur_inode, date + self.this_h_m)
             except Exception:
+                print("出错2")
                 return
         if self.this_h_m:
             self.mymongo.del_old_data(date, self.this_h_m)

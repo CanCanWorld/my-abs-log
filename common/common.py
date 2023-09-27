@@ -34,6 +34,7 @@ needed_fields = ('$remote_addr', [('$request_method', '$uri', '$args'), '$reques
                  '$request_time', '$status', ['$body_bytes_sent', '$bytes_sent'], ['$time_local', '$time_iso8601'])
 if LOG_TYPE == 'plaintext':
     supplied_fields = LOG_FORMAT.replace('[', '').replace(']', '').replace('"', '').split()
+    print('supplied_fields: ', supplied_fields)
 else:  # LOG_TYPE == 'json':
     supplied_fields = dict([(v, k) for k, v in json.loads(LOG_FORMAT).items()]).keys()
 for field in needed_fields:
