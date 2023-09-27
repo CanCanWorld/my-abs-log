@@ -138,6 +138,8 @@ def distribution(mongo_col, arguments):
         hits = one_doc['hits']
         bytes_ = one_doc['bytes']
         date = one_doc['_id']
+        if bytes_ == 0:
+            return
         print('{}  {}  {}%  {}  {}%  {}  {}'.format(date.rjust(10), str(hits).rjust(10),
               format(hits / total_dict['total_hits'] * 100, '.2f').rjust(6), get_human_size(bytes_).rjust(10),
               format(bytes_ / total_dict['total_bytes'] * 100, '.2f').rjust(7),

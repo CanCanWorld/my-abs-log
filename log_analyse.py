@@ -420,9 +420,9 @@ class Processor(object):
         """生成每分钟的文档, 存放到self.bulk_documents中"""
         server = gethostname()  # 主机名
         minute_main_doc = {
-            # '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(
-            #     random_char) + '-' + server,
-            '_id': date + self.this_h_m,
+            '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(
+                random_char) + '-' + server,
+            # '_id': date + self.this_h_m,
             'total_hits': self.processed_num,
             'invalid_hits': self.invalid_hits,
             'error_hits': self.error_hits,

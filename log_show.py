@@ -10,7 +10,7 @@ Options:
   -h --help                   Show this screen.
   -f --from <start_time>      Start time. Format: %y%m%d[%H[%M]], %H and %M is optional
   -t --to <end_time>          End time. Format is same as --from
-  -l --limit <num>            Number of lines in output, 0 means no limit. [default: 5]
+  -l --limit <num>            Number of lines in output, 0 means no limit. [default: 5] uri_abs
   -s --server <server>        Web server hostname
   -g --group_by <group_by>    Group by every minute, every ten minutes, every hour or every day,
                               valid values: "minute", "ten_min", "hour", "day". [default: hour]

@@ -43,6 +43,8 @@ def base_summary(ip_type, limit, mongo_col, match, total_dict):
         print('{}\n{}  {}  {}  {}  {}  {}'.format('=' * 20, 'From_client_directly'.ljust(20), 'hits'.rjust(10), 'hits(%)'.rjust(7), 'bytes'.rjust(10), 'bytes(%)'.rjust(8), 'time(%)'.rjust(7)))
         this_total = mongo_col.aggregate(pipeline_source_func('from_client_directly')).next()
     if ip_type != 'user_ip_via_cdn':
+        if this_total['bytes'] == 0:
+            return
         print('{}  {}  {}%  {}  {}%  {}%'.format('=' * 20, str(this_total['hits']).rjust(10),
                                           format(this_total['hits'] / total_dict['total_hits'] * 100, '.2f').rjust(6),
                                           get_human_size(this_total['bytes']).rjust(10),
