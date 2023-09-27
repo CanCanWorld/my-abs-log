@@ -45,12 +45,17 @@ def base_summary(what, limit, mongo_col, match, total_dict):
     for one_doc in mongo_result:
         uri = one_doc['_id']
         value = one_doc[what]
+        if value == 0:
+            return
         if what == 'hits':
             print('{}  {}%  {}  {}  {}'.format(
                 str(value).rjust(10), format(value / total_dict['total_hits'] * 100, '.2f').rjust(6),
                 format('%50<{} %75<{} %100<{}'.format(round(one_doc['q2_time'], 2), round(one_doc['q3_time'], 2), round(one_doc['max_time'], 2))).ljust(30),
                 format('%50<{} %75<{} %100<{}'.format(int(one_doc['q2_bytes']), int(one_doc['q3_bytes']), int(one_doc['max_bytes']))).ljust(36), uri))
         elif what == 'bytes':
+            print('value: ', value)
+            if value == 0:
+                return
             print('{}  {}%  {}  {}  {}'.format(
                 get_human_size(value).rjust(10), format(value / total_dict['total_bytes'] * 100, '.2f').rjust(6),
                 format('%50<{} %75<{} %100<{}'.format(round(one_doc['q2_time'], 2), round(one_doc['q3_time'], 2), round(one_doc['max_time'], 2))).ljust(30),

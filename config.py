@@ -61,7 +61,7 @@ IP_STORE_MAX_NUM = 30
 # mongodb中保存几天的数据
 LIMIT = 10
 # 批量插入: 累计多少分钟的处理结果执行一次入库(因为程序处理每分钟的原始日志生成一个该分钟的文档插入mongodb)
-BATCH_INSERT = 100
+BATCH_INSERT = 1
 
 # ----uri或args抽象规则
 """
@@ -102,6 +102,16 @@ ABS_SPECIAL = {'api_access.log': {
     将uri '/v3/recommend.json' 抽象为 '/v*/recommend.json', 而不是默认规则的 '/v3/recommend.json'
     将uri '/subscribe/read' 的args 'uid=111&channel=Android&version=2.7.3)' 抽象为 'uid=*channel=Android&version=2.7.3', 而不是默认规则的 'uid=*channel=*&version=*'
 """
-ABS_SPECIAL = {}
+# ABS_SPECIAL = {}
 
+ABS_SPECIAL = {'api_access.log': {
+    '^/point/([0-9]+)/[0-9]+/[0-9]+\.json': {
+        'uri_replace': '/viewPoint/\1/*/*.json',
+        'arg_replace': {'^(channel=.+&version=.+)': '\1'}},
+    '^/v[0-9]/recommend\.json': {
+        'uri_replace': '/v*/recommend.json'},
+    '^/subscribe/read': {
+        'arg_replace': {'^uid=.+&type=.+&(channel=.+&version=.+)': 'uid=*&type=*&\1'}}
+    }
+}
 

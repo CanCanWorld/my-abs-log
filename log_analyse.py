@@ -6,6 +6,7 @@ import logging
 # import fcntl
 import json
 import re
+import time
 from socket import gethostname
 from multiprocessing import Pool
 from random import choice
@@ -38,24 +39,27 @@ class MyMongo(object):
         inode: 当前处理的文件的inode
         """
         # timestamp = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
-        ##print('db_name:', self.db_name, 'cur_offset:', offset, 'cur_inode:', inode)
+        print('db_name:', self.db_name, 'cur_offset:', offset, 'cur_inode:', inode)
         try:
             self.mongodb['main'].insert_many(bulk_doc)  # 插入数据
             server = gethostname()  # 主机名
-            self.mongodb['registry'].update({'server': server},
-                                            {'$set': {'offset': offset, 'inode': inode, 'timestamp': timestamp}},
-                                            upsert=True)
+            # self.mongodb['registry'].update({'server': server},
+            #                                 {'$set': {'offset': offset, 'inode': inode, 'timestamp': timestamp}},
+            #                                 upsert=True)
         except Exception as err:
             logger.error('{} insert data error: {}'.format(self.db_name, repr(err)))
             raise
-        finally:
-            mongo_client.close()
+        # finally:
+        #     mongo_client.close()
 
     def get_prev_info(self):
         """取得本server本日志这一天已入库的offset"""
         print('"""取得本server本日志这一天已入库的offset"""')
         server = gethostname()  # 主机名
         print('db_name:', self.db_name, 'server:', server)
+        # select server, inode, offset from registry where server = 'redmibook-zrq';
+        # 游标： tmp.next {} 1,2,3
+        # registry=>存什么
         tmp = self.mongodb['registry'].find({'server': server}, {'server': 1, 'inode': 1, 'offset': 1})
         try:
             print('tmp.next')
@@ -77,7 +81,8 @@ class MyMongo(object):
         h_m: 当前hour and minute(到23:59时执行清理操作)"""
         if h_m != '2359':
             return
-        min_date = get_delta_date(date, LIMIT)
+        min_date = get_delta_date(date, LIMIT) + '2359'
+        print('min_date: ', min_date)
         try:
             self.mongodb['main'].remove({'_id': {'$lt': min_date}})
             self.mongodb['registry'].remove({'timestamp': {'$lt': min_date}})
@@ -92,8 +97,11 @@ class LogBase(object):
         self.log_name = log_name
         fstat = stat(log_name)
         self.cur_size = fstat.st_size
+        print("self.cur_size: ", self.cur_size)
         self.cur_timestamp = fstat.st_mtime
+        print("self.cur_timestamp: ", self.cur_timestamp)
         self.cur_inode = fstat.st_ino
+        print("self.cur_inode: ", self.cur_inode)
 
 
 class LogPlainText(LogBase):
@@ -108,11 +116,13 @@ class LogPlainText(LogBase):
                       r'"(?P<request_time>.*?)" "(?P<upstream_response_time>.*?)"$'
         log_pattern_obj = re.compile(log_pattern)
         parsed = log_pattern_obj.match(line_str)
+        print('parsed: ', parsed)
         if not parsed:
             # 如果正则无法匹配该行时
             logger.warning("Can't parse line: {}".format(line_str))
             return
         parsed_dict = parsed.groupdict()
+        print('parsed_dict: ', parsed_dict)
         # remote_addr字段在有反向代理的情况下多数时候是无意义的(仅代表反向代理的ip),
         # 除非：以nginx为例,配置了set_real_ip_from和real_ip_header指令(该指令也是下面分析请求流向是要考虑的)
         remote_addr = parsed_dict['remote_addr']
@@ -134,9 +144,12 @@ class LogPlainText(LogBase):
             # 2这种概率很小, 并且如果nginx有set_real_ip_from指令的话会和1无法区分,故而忽略此种情况
             # 3.user-->reverse_proxy-->web_server (last_cdn_ip == user_ip and last_cdn_ip != '-')
             # 4.user-->web_server(last_cdn_ip == user_ip == '-')
-            ips = http_x_forwarded_for.split()
+            ips = http_x_forwarded_for.split()  # ['-']
             user_ip = ips[0].rstrip(',')
             last_cdn_ip = ips[-1]
+            print('ips: ', ips)
+            print('user_ip: ', user_ip)
+            print('last_cdn_ip: ', last_cdn_ip)
         else:
             # 视为 user-->web_server
             user_ip = last_cdn_ip = None
@@ -150,9 +163,13 @@ class LogPlainText(LogBase):
                 uri_abs = args_abs = request_method = None
             else:
                 request_method = request_further.group('request_method')
+                print('request_method: ', request_method)
                 # 对uri和args进行抽象
                 uri_abs, args_abs = text_abstract(request_uri_=request_further.group('request_uri'),
                                                   log_name_=self.log_name)
+                print('uri_abs: ', uri_abs)
+                print('args_abs: ', args_abs)
+
         elif 'request_uri' in parsed_dict:
             request_method = parsed_dict['request_method']
             uri_abs, args_abs = text_abstract(request_uri_=parsed_dict['request_uri'], log_name_=self.log_name)
@@ -403,8 +420,9 @@ class Processor(object):
         """生成每分钟的文档, 存放到self.bulk_documents中"""
         server = gethostname()  # 主机名
         minute_main_doc = {
-            '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(
-                random_char) + '-' + server,
+            # '_id': date + self.this_h_m + '-' + choice(random_char) + choice(random_char) + choice(
+            #     random_char) + '-' + server,
+            '_id': date + self.this_h_m,
             'total_hits': self.processed_num,
             'invalid_hits': self.invalid_hits,
             'error_hits': self.error_hits,
@@ -469,6 +487,7 @@ class Processor(object):
             parsed_offset += len(line_str)
 
             line_res = logobj.parse_line(line_str)
+            print('line_res: ', line_res)
             if not line_res or not line_res['uri_abs']:
                 self.invalid_hits += 1
                 continue
@@ -478,11 +497,15 @@ class Processor(object):
 
             # 分钟粒度交替时: 从临时字典中汇总上一分钟的结果并将其入库
             print("分钟粒度交替时: 从临时字典中汇总上一分钟的结果并将其入库")
+            print('self.this_h_m: ', self.this_h_m)
+            print('hour + minute: ', hour + minute)
             if self.this_h_m != hour + minute and self.this_h_m:
+                print('in....')
                 self._generate_bulk_docs(date)
                 if len(self.bulk_documents) == BATCH_INSERT:  # 累积BATCH_INSERT个文档后执行一次批量插入
-                    print("累积BATCH_INSERT个文档后执行一次批量插入")
+                    print("insert")
                     try:
+                        print('self.mymongo: ',self.mymongo.db_name)
                         self.mymongo.insert_mongo(self.bulk_documents, parsed_offset, logobj.cur_inode,
                                                   date + self.this_h_m)
                         self.bulk_documents = []
@@ -506,12 +529,12 @@ class Processor(object):
             self._generate_bulk_docs(date)
         if self.bulk_documents and self.this_h_m:
             try:
-                print("bulk_documents: ", self.bulk_documents)
                 self.mymongo.insert_mongo(self.bulk_documents, parsed_offset, logobj.cur_inode, date + self.this_h_m)
             except Exception:
                 print("出错2")
                 return
         if self.this_h_m:
+            print("date: ", date, "self.this_h_m: ", self.this_h_m)
             self.mymongo.del_old_data(date, self.this_h_m)
 
 
@@ -539,6 +562,7 @@ if __name__ == "__main__":
         #     exit(11)
         if argv_log_list:
             logs_list = [path.join(getcwd(), x) if not x.startswith('/') else x for x in argv_log_list]
+            print('logs_list', logs_list)
         else:
             logs_list = todo_log()
         if len(logs_list) > 0:
